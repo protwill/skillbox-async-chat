@@ -27,6 +27,7 @@ class ServerProtocol(asyncio.Protocol):
                 if self.server.verify_login(login):
                     self.login = login
                     self.send_data(f"Привет, {self.login}!\n")
+                    self.send_history(10)
                 else:
                     self.send_data(f"Логин {login} занят, попробуйте другой\n")
                     self.transport.close()
@@ -48,18 +49,35 @@ class ServerProtocol(asyncio.Protocol):
     def send_message(self, content: str):
         message = f"{self.login}: {content}\n"
 
+        self.server.save_to_history(message)
+
         for user in self.server.clients:
             user.send_data(message)
+
+    def send_history(self, history_len: int = 0):
+        if history_len == 0:
+            history_len = len(self.server.history)
+
+        if history_len > len(self.server.history):
+            history_len = len(self.server.history)
+
+        for history_record in self.server.history[-history_len:]:
+            self.send_data(history_record)
 
 
 class Server:
     clients: list
+    history: list
 
     def __init__(self):
         self.clients = []
+        self.history = []
 
     def verify_login(self, login: str):
         return not any(client.login == login for client in self.clients)
+
+    def save_to_history(self, message: str):
+        self.history.append(message)
 
     def build_protocol(self):
         return ServerProtocol(self)
