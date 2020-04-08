@@ -36,8 +36,22 @@ class ServerProtocol(asyncio.Protocol):
     def logged_in(self):
         return self.login is not None
 
+    def _get_socket_name(self):
+        sock = self.transport.get_extra_info('socket')
+        return sock.getsockname()
+
+    @property
+    def host(self):
+        host, _ = self._get_socket_name()
+        return host
+
+    @property
+    def port(self):
+        _, port = self._get_socket_name()
+        return port
+
     def data_received(self, data: bytes):
-        print(data)
+        print(f"{self.login} ({self.host}): {data}")
 
         decoded = data.decode()
 
@@ -61,11 +75,11 @@ class ServerProtocol(asyncio.Protocol):
     def connection_made(self, transport: transports.Transport):
         self.server.clients.append(self)
         self.transport = transport
-        print("Пришел новый клиент")
+        print(f"Пришел новый клиент {self.host}")
 
     def connection_lost(self, exception):
         self.server.clients.remove(self)
-        print("Клиент вышел")
+        print(f"Клиент {self.login} ({self.host}) вышел")
 
     def send_data(self, data: str, end: str = ''):
         data = data + end
