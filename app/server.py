@@ -17,10 +17,13 @@ class Message:
         self.content = content
 
     def __str__(self):
-        return f"{self.author}: {self.content}\n"
+        return f"{self.author}: {self.content}"
 
 
 class ServerProtocol(asyncio.Protocol):
+    MESSAGE_ENDING = '\r'
+    DATA_ENDING = '\r\n'
+
     login: str = None
     server: 'Server'
     transport: transports.Transport
@@ -46,13 +49,13 @@ class ServerProtocol(asyncio.Protocol):
 
                 if self.server.verify_login(login):
                     self.login = login
-                    self.send_data(f"Привет, {self.login}!\n")
+                    self.send_data(f"Привет, {self.login}!", self.DATA_ENDING)
                     self.send_history(10)
                 else:
-                    self.send_data(f"Логин {login} занят, попробуйте другой\n")
+                    self.send_data(f"Логин {login} занят, попробуйте другой.", self.DATA_ENDING)
                     self.transport.close()
             else:
-                self.send_data("Неправильный логин\n")
+                self.send_data("Неправильный логин.", self.DATA_ENDING)
 
     def connection_made(self, transport: transports.Transport):
         self.server.clients.append(self)
@@ -63,14 +66,15 @@ class ServerProtocol(asyncio.Protocol):
         self.server.clients.remove(self)
         print("Клиент вышел")
 
-    def send_data(self, data: str):
+    def send_data(self, data: str, end: str = ''):
+        data = data + end
         self.transport.write(data.encode())
 
     def send_message(self, message: Message):
         self.server.save_to_history(message)
 
         for user in [client for client in self.server.clients if client.logged_in]:
-            user.send_data(str(message))
+            user.send_data(str(message), self.MESSAGE_ENDING)
 
     def send_history(self, history_len: int = 0):
         if history_len == 0:
