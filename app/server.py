@@ -77,14 +77,14 @@ class ServerProtocol(asyncio.Protocol):
         for user in [client for client in self.server.clients if client.logged_in]:
             user.send_data(str(message), self.ENDING_MESSAGE)
 
-    def send_history(self, history_len: int = 0):
-        if history_len == 0:
-            history_len = len(self.server.history)
+    def send_history(self, length: int = 0):
+        if length <= 0:
+            length = len(self.server.history)
 
-        if history_len > len(self.server.history):
-            history_len = len(self.server.history)
+        if length > len(self.server.history):
+            length = len(self.server.history)
 
-        for message in sorted(self.server.history, key=lambda msg: msg.timestamp)[-history_len:]:
+        for message in sorted(self.server.history, key=lambda msg: msg.timestamp)[-length:]:
             self.send_data(str(message))
 
 
