@@ -63,7 +63,7 @@ class ServerProtocol(asyncio.Protocol):
             self.send_message(message)
         else:
             if decoded.startswith("login:"):
-                login = decoded.replace("login:", "").replace("\r\n", "")
+                login = decoded.replace("login:", "")
 
                 if self.server.verify_login(login):
                     self.login = login
