@@ -3,6 +3,21 @@
 #
 import asyncio
 from asyncio import transports
+from datetime import datetime
+
+
+class Message:
+    timestamp: float
+    author: str
+    content: str
+
+    def __init__(self, author, content):
+        self.timestamp = datetime.now().timestamp()
+        self.author = author
+        self.content = content
+
+    def __str__(self):
+        return f"{self.author}: {self.content}\n"
 
 
 class ServerProtocol(asyncio.Protocol):
@@ -19,7 +34,8 @@ class ServerProtocol(asyncio.Protocol):
         decoded = data.decode()
 
         if self.login is not None:
-            self.send_message(decoded)
+            message = Message(self.login, decoded)
+            self.send_message(message)
         else:
             if decoded.startswith("login:"):
                 login = decoded.replace("login:", "").replace("\r\n", "")
@@ -46,13 +62,11 @@ class ServerProtocol(asyncio.Protocol):
     def send_data(self, data: str):
         self.transport.write(data.encode())
 
-    def send_message(self, content: str):
-        message = f"{self.login}: {content}\n"
-
+    def send_message(self, message: Message):
         self.server.save_to_history(message)
 
         for user in self.server.clients:
-            user.send_data(message)
+            user.send_data(str(message))
 
     def send_history(self, history_len: int = 0):
         if history_len == 0:
@@ -61,8 +75,8 @@ class ServerProtocol(asyncio.Protocol):
         if history_len > len(self.server.history):
             history_len = len(self.server.history)
 
-        for history_record in self.server.history[-history_len:]:
-            self.send_data(history_record)
+        for message in sorted(self.server.history, key=lambda msg: msg.timestamp)[-history_len:]:
+            self.send_data(str(message))
 
 
 class Server:
@@ -76,7 +90,7 @@ class Server:
     def verify_login(self, login: str):
         return not any(client.login == login for client in self.clients)
 
-    def save_to_history(self, message: str):
+    def save_to_history(self, message: Message):
         self.history.append(message)
 
     def build_protocol(self):
