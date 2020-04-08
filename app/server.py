@@ -28,12 +28,16 @@ class ServerProtocol(asyncio.Protocol):
     def __init__(self, server: 'Server'):
         self.server = server
 
+    @property
+    def logged_in(self):
+        return self.login is not None
+
     def data_received(self, data: bytes):
         print(data)
 
         decoded = data.decode()
 
-        if self.login is not None:
+        if self.logged_in:
             message = Message(self.login, decoded)
             self.send_message(message)
         else:
@@ -65,7 +69,7 @@ class ServerProtocol(asyncio.Protocol):
     def send_message(self, message: Message):
         self.server.save_to_history(message)
 
-        for user in self.server.clients:
+        for user in [client for client in self.server.clients if client.logged_in]:
             user.send_data(str(message))
 
     def send_history(self, history_len: int = 0):
