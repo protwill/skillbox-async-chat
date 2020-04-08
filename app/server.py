@@ -22,12 +22,16 @@ class ServerProtocol(asyncio.Protocol):
             self.send_message(decoded)
         else:
             if decoded.startswith("login:"):
-                self.login = decoded.replace("login:", "").replace("\r\n", "")
-                self.transport.write(
-                    f"Привет, {self.login}!\n".encode()
-                )
+                login = decoded.replace("login:", "").replace("\r\n", "")
+
+                if self.server.verify_login(login):
+                    self.login = login
+                    self.send_data(f"Привет, {self.login}!\n")
+                else:
+                    self.send_data(f"Логин {login} занят, попробуйте другой\n")
+                    self.transport.close()
             else:
-                self.transport.write("Неправильный логин\n".encode())
+                self.send_data("Неправильный логин\n")
 
     def connection_made(self, transport: transports.Transport):
         self.server.clients.append(self)
@@ -38,11 +42,14 @@ class ServerProtocol(asyncio.Protocol):
         self.server.clients.remove(self)
         print("Клиент вышел")
 
+    def send_data(self, data: str):
+        self.transport.write(data.encode())
+
     def send_message(self, content: str):
         message = f"{self.login}: {content}\n"
 
         for user in self.server.clients:
-            user.transport.write(message.encode())
+            user.send_data(message)
 
 
 class Server:
@@ -50,6 +57,9 @@ class Server:
 
     def __init__(self):
         self.clients = []
+
+    def verify_login(self, login: str):
+        return not any(client.login == login for client in self.clients)
 
     def build_protocol(self):
         return ServerProtocol(self)
@@ -68,9 +78,10 @@ class Server:
         await coroutine.serve_forever()
 
 
-process = Server()
+if __name__ == '__main__':
+    process = Server()
 
-try:
-    asyncio.run(process.start())
-except KeyboardInterrupt:
-    print("Сервер остановлен вручную")
+    try:
+        asyncio.run(process.start())
+    except KeyboardInterrupt:
+        print("Сервер остановлен вручную")
