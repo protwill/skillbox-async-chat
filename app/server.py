@@ -4,6 +4,7 @@
 import asyncio
 from asyncio import transports
 from datetime import datetime
+from argparse import ArgumentParser
 
 
 class Message:
@@ -21,8 +22,8 @@ class Message:
 
 
 class ServerProtocol(asyncio.Protocol):
-    MESSAGE_ENDING = '\r'
-    DATA_ENDING = '\r\n'
+    ENDING_DATA = "\r\n"
+    ENDING_MESSAGE = "\r"
 
     login: str = None
     server: 'Server'
@@ -49,13 +50,13 @@ class ServerProtocol(asyncio.Protocol):
 
                 if self.server.verify_login(login):
                     self.login = login
-                    self.send_data(f"Привет, {self.login}!", self.DATA_ENDING)
+                    self.send_data(f"Привет, {self.login}!", self.ENDING_DATA)
                     self.send_history(10)
                 else:
-                    self.send_data(f"Логин {login} занят, попробуйте другой.", self.DATA_ENDING)
+                    self.send_data(f"Логин {login} занят, попробуйте другой.", self.ENDING_DATA)
                     self.transport.close()
             else:
-                self.send_data("Неправильный логин.", self.DATA_ENDING)
+                self.send_data("Неправильный логин.", self.ENDING_DATA)
 
     def connection_made(self, transport: transports.Transport):
         self.server.clients.append(self)
@@ -74,7 +75,7 @@ class ServerProtocol(asyncio.Protocol):
         self.server.save_to_history(message)
 
         for user in [client for client in self.server.clients if client.logged_in]:
-            user.send_data(str(message), self.MESSAGE_ENDING)
+            user.send_data(str(message), self.ENDING_MESSAGE)
 
     def send_history(self, history_len: int = 0):
         if history_len == 0:
@@ -104,24 +105,30 @@ class Server:
     def build_protocol(self):
         return ServerProtocol(self)
 
-    async def start(self):
+    async def start(self, host, port):
         loop = asyncio.get_running_loop()
+        coroutine = await loop.create_server(self.build_protocol, host, port)
 
-        coroutine = await loop.create_server(
-            self.build_protocol,
-            '127.0.0.1',
-            8888
-        )
-
-        print("Сервер запущен ...")
+        print(f"Сервер {host}:{port} запущен ...")
 
         await coroutine.serve_forever()
 
 
+def get_cmd_params():
+    parser = ArgumentParser(add_help=False)
+
+    parser.add_argument('--host', '-h', nargs="?", dest="host", type=str, default="127.0.0.1")
+    parser.add_argument('--port', '-p', nargs="?", dest="port", type=int, default=8888)
+
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    params = get_cmd_params()
+
     process = Server()
 
     try:
-        asyncio.run(process.start())
+        asyncio.run(process.start(params.host, params.port))
     except KeyboardInterrupt:
         print("Сервер остановлен вручную")
