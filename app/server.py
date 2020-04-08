@@ -32,6 +32,12 @@ class ServerProtocol(asyncio.Protocol):
     def __init__(self, server: 'Server'):
         self.server = server
 
+    def __str__(self):
+        if self.login:
+            return f"{self.login} ({self.host})"
+
+        return f"{self.host}"
+
     @property
     def logged_in(self):
         return self.login is not None
@@ -51,7 +57,7 @@ class ServerProtocol(asyncio.Protocol):
         return port
 
     def data_received(self, data: bytes):
-        print(f"{self.login} ({self.host}): {data}")
+        print(f"{self}: {data}")
 
         decoded = data.decode()
 
@@ -64,6 +70,9 @@ class ServerProtocol(asyncio.Protocol):
 
                 if self.server.verify_login(login):
                     self.login = login
+
+                    print(f"Клиент {self.host} залогинился как {self.login}")
+
                     self.send_data(f"Привет, {self.login}!", self.ENDING_DATA)
                     self.send_history(10)
                 else:
@@ -75,11 +84,11 @@ class ServerProtocol(asyncio.Protocol):
     def connection_made(self, transport: transports.Transport):
         self.server.clients.append(self)
         self.transport = transport
-        print(f"Пришел новый клиент {self.host}")
+        print(f"Пришел новый клиент {self}")
 
     def connection_lost(self, exception):
         self.server.clients.remove(self)
-        print(f"Клиент {self.login} ({self.host}) вышел")
+        print(f"Клиент {self} вышел")
 
     def send_data(self, data: str, end: str = ''):
         data = data + end
